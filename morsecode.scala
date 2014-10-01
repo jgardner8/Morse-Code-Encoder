@@ -48,23 +48,23 @@ object MorseCode extends App {
     }
 
     def tonesToWavFile(tones: Seq[Tone], fileName: String, pitchHz: Double) = {
-  		import java.io.File, Math._
+      import java.io.File, Math._
       val sampleRate = 44100
-  		val durationSec = tones.foldLeft(0.0)(_ + _.time)
-  		val numSamples = (durationSec * sampleRate).toInt
-  		val wavFile = WavFile.newWavFile(new File(fileName), numChannels=1, numSamples, 
-  			validBits=16, sampleRate)
+      val durationSec = tones.foldLeft(0.0)(_ + _.time)
+      val numSamples = (durationSec * sampleRate).toInt
+      val wavFile = WavFile.newWavFile(new File(fileName), numChannels=1, numSamples, 
+        validBits=16, sampleRate)
 
       val sinWaveRate = pitchHz * PI * 2.0
-  		val volumeBuffer = tones.foldLeft(Array[Double]()) { (acc, cur) =>
-  			acc ++ (0 to (cur.time * sampleRate).toInt map { sampleNum => 
+      val volumeBuffer = tones.foldLeft(Array[Double]()) { (acc, cur) =>
+        acc ++ (0 to (cur.time * sampleRate).toInt map { sampleNum => 
           if (cur.noise) sin((sampleNum / sampleRate.toDouble) * sinWaveRate)
           else 0
         })
-  		}
+      }
 
       wavFile.writeFrames(volumeBuffer, numSamples)
-  		wavFile.close()
+      wavFile.close()
     }
 
     val tones = morseToTones(morseStr, dotTime)
