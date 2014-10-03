@@ -1,15 +1,15 @@
 object MorseCode extends App {
-  def asciiToMorse(s: String) = {
+  def asciiToMorse(s: String): String = {
     val morseArr = Array(".-", "-...", "-.-.", "-..", ".", "..-.", "--.", "....", "..", ".---", 
       "-.-", ".-..", "--", "-.", "---", ".--.", "--.-", ".-.", "...", "-", "..-", "...-", 
       ".--", "-..-", "-.--", "--..")
-    def asciiCharToMorse(char: Char) =
+    def asciiCharToMorse(char: Char): String =
       if (char == ' ') "/"
       else morseArr(char.toLower - 'a'.toInt) 
     s map asciiCharToMorse mkString " "
   }
 
-  def outputText(asciiStr: String, morseStr: String) = {
+  def outputText(asciiStr: String, morseStr: String): Unit = {
     val asciiStrPadded = (asciiStr, morseStr.split(' ')).zipped map { (asciiChar, morseChar) => 
       if (asciiChar == ' ') "/ "
       else asciiChar.toString.padTo(morseChar.length + 1, ' ')
@@ -19,10 +19,10 @@ object MorseCode extends App {
     println(morseStr)
   }
 
-  def outputWav(morseStr: String, fileName: String, dotTime: Double, pitchHz: Int) = {
+  def outputWav(morseStr: String, fileName: String, dotTime: Double, pitchHz: Int): Unit = {
     case class Tone(noise: Boolean, time: Double)
 
-    def morseToTones(morseStr: String, dotTime: Double) = {
+    def morseToTones(morseStr: String, dotTime: Double): Seq[Tone] = {
       val dot = Tone(true, dotTime)
       val dash = Tone(true, dotTime * 3)
       val delayDotDash = Tone(false, dotTime)
@@ -47,23 +47,32 @@ object MorseCode extends App {
       soundsMinusRedundantDelays
     }
 
-    def tonesToWavFile(tones: Seq[Tone], fileName: String, pitchHz: Double) = {
+    def tonesToWavFile(tones: Seq[Tone], fileName: String, pitchHz: Double): Unit = {
       import java.io.File, Math._
       val sampleRate = 44100
-      val durationSec = tones.foldLeft(0.0)(_ + _.time)
-      val numSamples = (durationSec * sampleRate).toInt
+      val desiredBatchSize = sampleRate / 4
+      val durationSec = tones.foldLeft(0.0) { _ + _.time }
+      val numSamples = (durationSec * sampleRate).toLong
       val wavFile = WavFile.newWavFile(new File(fileName), numChannels=1, numSamples, 
         validBits=16, sampleRate)
 
-      val sinWaveRate = pitchHz * PI * 2.0
-      val volumeBuffer = tones.foldLeft(Array[Double]()) { (acc, cur) =>
-        acc ++ (0 to (cur.time * sampleRate).toInt map { sampleNum => 
+      val sinWaveRate = pitchHz * PI * 2
+      def samples = tones.foldLeft(Stream[Double]()) { (acc, cur) =>
+        val numSamples = (cur.time * sampleRate).toInt
+        acc append ((0 to numSamples) map { sampleNum => 
           if (cur.noise) sin((sampleNum / sampleRate.toDouble) * sinWaveRate)
           else 0
         })
       }
 
-      wavFile.writeFrames(volumeBuffer, numSamples)
+      (0 to (numSamples / desiredBatchSize.toDouble).toInt).foldLeft(samples) { (samples, batchIdx) => 
+        val samplesLeft = numSamples - (batchIdx * desiredBatchSize)
+        val batchSize = min(desiredBatchSize, samplesLeft).toInt
+        val batch = samples.take(batchSize).toArray
+        wavFile.writeFrames(batch, batchSize)
+        samples.drop(batchSize)
+      }
+
       wavFile.close()
     }
 
@@ -71,7 +80,7 @@ object MorseCode extends App {
     tonesToWavFile(tones, fileName, pitchHz)
   }
 
-  def parseArgs(args: Seq[String]) = {
+  def parseArgs(args: Seq[String]): (String, Option[String], Double, Int) = {
     val defDotTime = 0.075
     val defPitchHz = 1000
 
@@ -88,5 +97,5 @@ object MorseCode extends App {
   val (asciiStr, fileName, dotTime, pitchHz) = parseArgs(args)
   val morseStr = asciiToMorse(asciiStr)
   outputText(asciiStr, morseStr)
-  fileName map { outputWav(morseStr, _, dotTime, pitchHz) }
+  fileName foreach { outputWav(morseStr, _, dotTime, pitchHz) }
 }
