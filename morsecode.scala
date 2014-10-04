@@ -42,7 +42,7 @@ object MorseCode extends App {
     def tonesToWavFile(tones: Seq[Tone], fileName: String, pitchHz: Double): Unit = {
       import java.io.File, Math._
       val sampleRate = 44100
-      val desiredBatchSize = sampleRate / 4
+      val desiredBatchSize = sampleRate / 100
       val durationSec = tones.foldLeft(0.0) { _ + _.time }
       val numSamples = (durationSec * sampleRate).toLong
       val wavFile = WavFile.newWavFile(new File(fileName), numChannels=1, numSamples, 
