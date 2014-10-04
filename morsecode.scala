@@ -29,20 +29,14 @@ object MorseCode extends App {
       val delayChar = Tone(false, dotTime * 3)
       val delayWord = Tone(false, dotTime * 7)
       
-      val soundsWithRedundantDelays = morseStr.split(' ') flatMap { morseChar =>
-        (morseChar.map { char =>
+      morseStr.split(' ').foldLeft(List[Tone]()) { (acc, morseChar) =>
+        val tones = (morseChar map { char =>
           if (char == '/') Seq(delayWord)
           else Seq(if (char == '.') dot else dash, delayDotDash)
-        }).flatten :+ delayChar
+        }).flatten
+        if (tones.head == delayWord) acc.init ++ tones
+        else acc ++ tones.init :+ delayChar
       }
-        
-      (soundsWithRedundantDelays.foldLeft(List[Tone]()) { (acc, cur) =>
-        if (cur == delayWord) cur :: acc.tail
-        else if (cur == delayChar) { 
-          if (acc.head == delayWord) acc 
-          else cur :: acc.tail
-        } else cur :: acc
-      }).tail.reverse
     }
 
     def tonesToWavFile(tones: Seq[Tone], fileName: String, pitchHz: Double): Unit = {
