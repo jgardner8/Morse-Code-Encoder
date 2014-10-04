@@ -29,22 +29,20 @@ object MorseCode extends App {
       val delayChar = Tone(false, dotTime * 3)
       val delayWord = Tone(false, dotTime * 7)
       
-      val sounds = morseStr.split(' ') flatMap { morseChar =>
+      val soundsWithRedundantDelays = morseStr.split(' ') flatMap { morseChar =>
         (morseChar.map { char =>
           if (char == '/') Seq(delayWord)
           else Seq(if (char == '.') dot else dash, delayDotDash)
         }).flatten :+ delayChar
       }
         
-      val soundsMinusRedundantDelays = (sounds.foldLeft(List[Tone]()) { (acc, cur) =>
+      (soundsWithRedundantDelays.foldLeft(List[Tone]()) { (acc, cur) =>
         if (cur == delayWord) cur :: acc.tail
         else if (cur == delayChar) { 
           if (acc.head == delayWord) acc 
           else cur :: acc.tail
         } else cur :: acc
       }).tail.reverse
-
-      soundsMinusRedundantDelays
     }
 
     def tonesToWavFile(tones: Seq[Tone], fileName: String, pitchHz: Double): Unit = {
@@ -56,17 +54,26 @@ object MorseCode extends App {
       val wavFile = WavFile.newWavFile(new File(fileName), numChannels=1, numSamples, 
         validBits=16, sampleRate)
 
-      val sinWaveRate = pitchHz * PI * 2
+      val sinWaveRate = pitchHz * 2*PI
+      val sinMemo = Memoize1(sin)
       def samples = tones.foldLeft(Stream[Double]()) { (acc, cur) =>
         val numSamples = (cur.time * sampleRate).toInt
         acc append ((0 to numSamples) map { sampleNum => 
-          if (cur.noise) sin((sampleNum / sampleRate.toDouble) * sinWaveRate)
+          def normaliseToPeriod(x: Double, period: Double) = {
+            var varX = x
+            while (varX > period) 
+              varX -= period
+            varX
+          }  
+          val x = (sampleNum / sampleRate.toDouble) * sinWaveRate
+          if (cur.noise) sinMemo(normaliseToPeriod(x, 2*PI))
           else 0
         })
       }
 
-      (0 to (numSamples / desiredBatchSize.toDouble).toInt).foldLeft(samples) { (samples, batchIdx) => 
-        val samplesLeft = numSamples - (batchIdx * desiredBatchSize)
+      val numBatches = numSamples / desiredBatchSize.toDouble
+      (0 to numBatches.toInt).foldLeft(samples) { (samples, batchNum) => 
+        val samplesLeft = numSamples - (batchNum * desiredBatchSize)
         val batchSize = min(desiredBatchSize, samplesLeft).toInt
         val batch = samples.take(batchSize).toArray
         wavFile.writeFrames(batch, batchSize)
