@@ -53,10 +53,10 @@ object MorseCode extends App {
       def samples = tones.foldLeft(Stream[Double]()) { (acc, cur) =>
         val numSamples = (cur.time * sampleRate).toInt
         acc append ((0 to numSamples) map { sampleNum => 
-          def normaliseToPeriod[T : Numeric](x: T, period: T): T = {
-            import Numeric.Implicits._, Ordering.Implicits._
-            if (x > period) normaliseToPeriod(x - period, period)
-            else x
+          def normaliseToPeriod(x: Double, period: Double): Double = {
+            val div = x / period
+            if (div < 1) x
+            else x - (period * floor(div))
           }
           val x = (sampleNum / sampleRate.toDouble) * sinWaveRate
           if (cur.noise) sinMemo(normaliseToPeriod(x, 2*PI))
